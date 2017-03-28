@@ -3,6 +3,7 @@ apply plugin: 'io.fabric'
 
 repositories {
     maven { url 'https://maven.fabric.io/public' }
+    maven { url 'https://jitpack.io' }
 }
 android {
     compileSdkVersion 23
@@ -31,6 +32,7 @@ android {
 buildscript {
     repositories {
         maven { url 'https://maven.fabric.io/public' }
+        maven { url 'https://jitpack.io' }
     }
 
     dependencies {
@@ -42,7 +44,8 @@ dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     testCompile 'junit:junit:4.12'
     compile 'com.android.support:appcompat-v7:23.3.0'
-    compile(name:'com.bleScent.library-debug', ext:'aar')
+   // compile(name:'com.bleScent.library-debug', ext:'aar')
+    compile 'com.github.VaporCommunications:android-demo-app:-SNAPSHOT'
     compile('com.crashlytics.sdk.android:crashlytics:2.6.7@aar') {
         transitive = true;
     }
