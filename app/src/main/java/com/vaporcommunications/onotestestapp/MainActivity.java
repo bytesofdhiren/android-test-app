@@ -20,6 +20,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
 
@@ -45,8 +46,10 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
 
     private Button btnConnect;
     private Button btnTest;
+    private Button btnGetFamilyCode;
     private TextView tvMessages;
     private TextView deviceId;
+    private TextView rfId;
 
 
     private BluetoothLeService mBluetoothLeService;
@@ -59,10 +62,14 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         Fabric.with(this, new Crashlytics());
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        if(getSupportActionBar()!=null)getSupportActionBar().hide();
         btnConnect = (Button) findViewById(R.id.button_connect);
         btnTest = (Button) findViewById(R.id.button_test);
+        btnGetFamilyCode = (Button) findViewById(R.id.button_family_code);
         tvMessages = (TextView) findViewById(R.id.text_messages);
         deviceId = (TextView) findViewById(R.id.deviceId);
+        rfId = (TextView) findViewById(R.id.rfId);
         btnConnect.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -82,6 +89,7 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
         btnTest.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                rfId.setVisibility(View.INVISIBLE);
                 if (mTest) {
                     mTest = false;
                     tvMessages.setText("Play Smell Started");
@@ -91,6 +99,13 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
                     mTest = true;
                     mBluetoothLeService.playScent(60, 80, "EJO");
                 }
+            }
+        });
+
+        btnGetFamilyCode.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mBluetoothLeService.queryForRFID();
             }
         });
     }
@@ -162,7 +177,9 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
         btnConnect.setText("Connect");
         btnTest.setText("Test");
         btnTest.setEnabled(false);
+        btnGetFamilyCode.setEnabled(false);
         deviceId.setVisibility(View.INVISIBLE);
+        rfId.setVisibility(View.INVISIBLE);
     }
 
     private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
@@ -191,9 +208,20 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
                 mConnected = true;
                 btnConnect.setText("Disconnect");
                 btnTest.setEnabled(true);
+                btnGetFamilyCode.setEnabled(true);
                 mBluetoothLeService.stopScent();
             } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
                 initialize();
+            }else if(BluetoothLeService.notification.OPBTPeripheralRFIDReadNotification.name().equals(action)){
+               /* byte[] identifierData=intent.getByteArrayExtra(BluetoothLeService.Key.OPBTPeripheralRFIDIdentifierKey.name());
+                StringBuilder responseString = new StringBuilder();
+                for (byte byteChar : identifierData)
+                    responseString.append(String.format("%02X ", byteChar));
+                responseString.append("\n");*/
+                short familyCode=intent.getShortExtra(BluetoothLeService.Key.OPBTPeripheralRFIDFamilyKey.name(),(short) 0);
+
+                rfId.setText("family code:"+familyCode);
+                rfId.setVisibility(View.VISIBLE);
             } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
                 if (mTest) {
                     tvMessages.setTextColor(getResources().getColor(R.color.colorYellow));
@@ -345,8 +373,8 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
         intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
-        intentFilter.addAction("PARSE_RESPONSE");
         intentFilter.addAction(BluetoothLeService.notification.OPBTPeripheralFirmwareRevisionNotification.name());
+        intentFilter.addAction(BluetoothLeService.notification.OPBTPeripheralRFIDReadNotification.name());
         return intentFilter;
     }
 
