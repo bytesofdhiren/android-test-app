@@ -23,6 +23,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import com.blescent.library.BluetoothLeService;
 import com.crashlytics.android.Crashlytics;
@@ -55,7 +56,8 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
     private BluetoothLeService mBluetoothLeService;
     private Handler mHandler;
     private Runnable mRunnable;
-
+    private Handler queryRfIdHandler;
+    private int count;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -101,14 +103,29 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
                 }
             }
         });
-
+        queryRfIdHandler = new Handler();
         btnGetFamilyCode.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mBluetoothLeService.queryForRFID();
+                    count = 0;
+                    queryRfIdHandler.postDelayed(queryRfIdRunnable, 1000);
+
             }
         });
     }
+    private Runnable queryRfIdRunnable= new Runnable() {
+        @Override
+        public void run() {
+            if(count<5){
+                mBluetoothLeService.queryForRFID();
+                queryRfIdHandler.postDelayed(this,3000);
+                count++;
+            }else{
+                Toast.makeText(getApplicationContext(),"Try Again..",Toast.LENGTH_SHORT).show();
+                queryRfIdHandler.removeCallbacks(queryRfIdRunnable);
+            }
+        }
+    };
 
     @Override
     protected void onResume() {
@@ -218,6 +235,7 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
                 for (byte byteChar : identifierData)
                     responseString.append(String.format("%02X ", byteChar));
                 responseString.append("\n");*/
+                queryRfIdHandler.removeCallbacks(queryRfIdRunnable);
                 short familyCode=intent.getShortExtra(BluetoothLeService.Key.OPBTPeripheralRFIDFamilyKey.name(),(short) 0);
 
                 rfId.setText("family code:"+familyCode);
