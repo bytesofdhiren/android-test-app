@@ -44,26 +44,40 @@
         android:textSize="24sp"
         android:visibility="invisible" />
 
+
     <TextView
         android:id="@+id/rfId"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentStart="true"
         android:layout_below="@+id/deviceId"
-        android:layout_marginTop="30dp"
+        android:layout_marginTop="20dp"
         android:text="deviceId"
         android:textAlignment="center"
         android:textColor="@color/colorPrimary"
         android:textSize="24sp"
         android:visibility="invisible" />
 
+    <TextView
+        android:id="@+id/rfIdStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_below="@+id/rfId"
+        android:layout_marginTop="20dp"
+        android:text="deviceId"
+        android:textAlignment="center"
+        android:textColor="@color/colorPrimary"
+        android:textSize="14sp"
+        android:visibility="invisible" />
+
     <Button
         android:id="@+id/button_connect"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_below="@id/rfId"
+        android:layout_below="@id/rfIdStatus"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="40dp"
+        android:layout_marginTop="30dp"
         android:background="@drawable/btn_blue"
         android:text="Connect"
         android:textColor="@color/colorTextWhile" />
@@ -79,22 +93,12 @@
             android:id="@+id/button_test"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_alignParentStart="true"
+            android:layout_centerInParent="true"
             android:background="@drawable/btn_blue"
             android:enabled="false"
             android:text="Test"
             android:textColor="@color/colorTextWhile"
 
             />
-
-        <Button
-            android:id="@+id/button_family_code"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:background="@drawable/btn_blue"
-            android:enabled="false"
-            android:text="GetFamilyCode"
-            android:textColor="@color/colorTextWhile" />
     </RelativeLayout>
 </RelativeLayout>

@@ -47,10 +47,11 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
 
     private Button btnConnect;
     private Button btnTest;
-    private Button btnGetFamilyCode;
+   // private Button btnGetFamilyCode;
     private TextView tvMessages;
     private TextView deviceId;
     private TextView rfId;
+    private TextView rfIdStatus;
 
 
     private BluetoothLeService mBluetoothLeService;
@@ -58,7 +59,8 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
     private Runnable mRunnable;
     private Handler queryRfIdHandler;
     private int count;
-
+    private boolean gotFamilyId = false;
+    private boolean gotFirmware = false;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -68,10 +70,12 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
         if(getSupportActionBar()!=null)getSupportActionBar().hide();
         btnConnect = (Button) findViewById(R.id.button_connect);
         btnTest = (Button) findViewById(R.id.button_test);
-        btnGetFamilyCode = (Button) findViewById(R.id.button_family_code);
+       // btnGetFamilyCode = (Button) findViewById(R.id.button_family_code);
         tvMessages = (TextView) findViewById(R.id.text_messages);
         deviceId = (TextView) findViewById(R.id.deviceId);
         rfId = (TextView) findViewById(R.id.rfId);
+        rfIdStatus = (TextView) findViewById(R.id.rfIdStatus);
+
         btnConnect.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -79,8 +83,10 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
                     if (mConnected) {
                         tvMessages.setTextColor(getResources().getColor(R.color.colorYellow));
                         tvMessages.setText("Disconnecting..");
+                        queryRfIdHandler.removeCallbacks(queryRfIdRunnable);
                         mBluetoothLeService.disconnect();
                     } else {
+                        gotFamilyId= false;
                         scanLeDevice(true);
                     }
                 } else {
@@ -91,38 +97,53 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
         btnTest.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                rfId.setVisibility(View.INVISIBLE);
                 if (mTest) {
-                    mTest = false;
-                    tvMessages.setText("Play Smell Started");
-                    tvMessages.setTextColor(getResources().getColor(R.color.colorYellow));
+                    tvMessages.setText("Stop Smell query");
                     mBluetoothLeService.stopScent();
                 } else {
-                    mTest = true;
+                    tvMessages.setText("Play Smell query");
+                    tvMessages.setTextColor(getResources().getColor(R.color.colorYellow));
                     mBluetoothLeService.playScent(60, 80, "EJO");
                 }
+                btnTest.setEnabled(false);
             }
         });
         queryRfIdHandler = new Handler();
-        btnGetFamilyCode.setOnClickListener(new View.OnClickListener() {
+       /* btnGetFamilyCode.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                     count = 0;
                     queryRfIdHandler.postDelayed(queryRfIdRunnable, 1000);
 
             }
-        });
+        });*/
+
+        initialize();
+        Intent gattServiceIntent = new Intent(this, BluetoothLeService.class);
+        bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
+        registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
     }
     private Runnable queryRfIdRunnable= new Runnable() {
         @Override
         public void run() {
-            if(count<5){
-                mBluetoothLeService.queryForRFID();
-                queryRfIdHandler.postDelayed(this,3000);
+            if(count<2 && !gotFamilyId){
                 count++;
-            }else{
-                Toast.makeText(getApplicationContext(),"Try Again..",Toast.LENGTH_SHORT).show();
+                mBluetoothLeService.queryForRFID();
+                queryRfIdHandler.postDelayed(this,5000);
+
+            }else if(count == 1000 ){
+                if(!gotFamilyId) {
+                    rfId.setText("No Scent Family ID");
+                    btnTest.setEnabled(true);
+                }
+
                 queryRfIdHandler.removeCallbacks(queryRfIdRunnable);
+            }else{
+              //  Toast.makeText(getApplicationContext(),"Try Again..",Toast.LENGTH_SHORT).show();
+
+                count = 1000;
+                queryRfIdHandler.postDelayed(this,3000);
+                mBluetoothLeService.stopScent();
             }
         }
     };
@@ -130,20 +151,13 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
     @Override
     protected void onResume() {
         super.onResume();
-        initialize();
-        Intent gattServiceIntent = new Intent(this, BluetoothLeService.class);
-        bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
-        registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
+
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        unregisterReceiver(mGattUpdateReceiver);
-        scanLeDevice(false);
-        if (mBluetoothLeService != null)
-            mBluetoothLeService.disconnect();
-        unbindService(mServiceConnection);
+
     }
 
     @Override
@@ -194,9 +208,11 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
         btnConnect.setText("Connect");
         btnTest.setText("Test");
         btnTest.setEnabled(false);
-        btnGetFamilyCode.setEnabled(false);
+       // btnGetFamilyCode.setEnabled(false);
         deviceId.setVisibility(View.INVISIBLE);
         rfId.setVisibility(View.INVISIBLE);
+        rfIdStatus.setVisibility(View.INVISIBLE);
+
     }
 
     private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
@@ -204,17 +220,24 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
             if (BluetoothLeService.ACTION_GATT_CONNECTED.equals(action)) {
+                gotFirmware = false;
                 tvMessages.setText("Confirming...");
                 btnTest.setText("Test");
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
                 if (mBluetoothLeService != null && mBluetoothLeService.isCharacteristicsPresent()) {
-                    tvMessages.setText("getting Firmware Revision...");
+                    tvMessages.setText("Getting Device Status...");
                 } else {
                     tvMessages.setText("Failed to Connect");
                     mBluetoothLeService.disconnect();
                     initialize();
+                    mBluetoothLeService.close();
                 }
-            } else if (BluetoothLeService.notification.OPBTPeripheralFirmwareRevisionNotification.name().equals(action)) {
+            }else if(BluetoothLeService.notification.OPBTPeripheralPlayScentNotification.name().equals(action)){
+                scentPlayStarted();
+            }else if(BluetoothLeService.notification.OPBTPeripheralStopScentNotification.name().equals(action)){
+                scentStopped();
+            } else if (BluetoothLeService.notification.OPBTPeripheralDeviceStatusNotification.name().equals(action)) {
+                gotFirmware = true;
                 mFirstStop = true;
                 tvMessages.setTextColor(getResources().getColor(R.color.colorPrimary));
                 tvMessages.setText("Successfully connected");
@@ -224,9 +247,17 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
                 deviceId.setVisibility(View.VISIBLE);
                 mConnected = true;
                 btnConnect.setText("Disconnect");
-                btnTest.setEnabled(true);
-                btnGetFamilyCode.setEnabled(true);
-                mBluetoothLeService.stopScent();
+               // btnGetFamilyCode.setEnabled(true);
+                rfId.setVisibility(View.VISIBLE);
+                if(BluetoothLeService.getFirmwareRevision()>0x24){
+                    count = 0;
+                    mBluetoothLeService.queryForRFID();
+                  //  queryRfIdHandler.postDelayed(queryRfIdRunnable, 1000);
+                    rfId.setText("Reading RFID...");
+                }else{
+                    rfId.setText("No Scent Family ID");
+                    btnTest.setEnabled(true);
+                }
             } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
                 initialize();
             }else if(BluetoothLeService.notification.OPBTPeripheralRFIDReadNotification.name().equals(action)){
@@ -235,46 +266,61 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
                 for (byte byteChar : identifierData)
                     responseString.append(String.format("%02X ", byteChar));
                 responseString.append("\n");*/
+                gotFamilyId = true;
                 queryRfIdHandler.removeCallbacks(queryRfIdRunnable);
                 short familyCode=intent.getShortExtra(BluetoothLeService.Key.OPBTPeripheralRFIDFamilyKey.name(),(short) 0);
+                boolean status=intent.getByteExtra(BluetoothLeService.Key.OPBTPeripheralRFIDValidKey.name(),(byte) 0)!=0;
+                rfId.setText("Scent Family ID:"+familyCode);
+                btnTest.setEnabled(true);
+               // mBluetoothLeService.stopScent();
+                rfIdStatus.setVisibility(View.VISIBLE);
+                rfIdStatus.setText("RFId Status:"+status);
 
-                rfId.setText("family code:"+familyCode);
-                rfId.setVisibility(View.VISIBLE);
             } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
-                if (mTest) {
-                    tvMessages.setTextColor(getResources().getColor(R.color.colorYellow));
-                    tvMessages.setText("Playing Scent");
-                    btnConnect.setEnabled(false);
-                    btnTest.setText("Stop");
-                    mHandler = new Handler();
-                    mRunnable = new Runnable() {
-                        @Override
-                        public void run() {
-                            mTest = false;
-                            btnConnect.setEnabled(true);
-                            tvMessages.setTextColor(getResources().getColor(R.color.colorYellow));
-                            btnTest.setText("Test");
-                            tvMessages.setText("Scent Stopped");
-                            mHandler.removeCallbacks(this);
-                        }
-                    };
-                    mHandler.postDelayed(mRunnable, 60000);
-                } else {
-                    if (mFirstStop) {
-                        mFirstStop = false;
+                if(gotFirmware){
+                    if (mTest) {
+
                     } else {
-                        tvMessages.setText("Scent Stopped");
-                        tvMessages.setTextColor(getResources().getColor(R.color.colorYellow));
-                    }
-                    btnConnect.setEnabled(true);
-                    btnTest.setText("Test");
-                    if (mHandler != null) {
-                        mHandler.removeCallbacks(mRunnable);
+
                     }
                 }
             }
         }
     };
+
+    private void scentPlayStarted(){
+        mTest = true;
+        btnTest.setEnabled(true);
+        tvMessages.setTextColor(getResources().getColor(R.color.colorYellow));
+        tvMessages.setText("Playing Scent");
+        btnConnect.setEnabled(false);
+        btnTest.setText("Stop");
+        mHandler = new Handler();
+        mRunnable = new Runnable() {
+            @Override
+            public void run() {
+                mTest = false;
+                btnConnect.setEnabled(true);
+                tvMessages.setTextColor(getResources().getColor(R.color.colorYellow));
+                btnTest.setText("Test");
+                tvMessages.setText("Scent Stopped");
+                mHandler.removeCallbacks(this);
+            }
+        };
+        mHandler.postDelayed(mRunnable, 60000);
+    }
+
+    private void scentStopped(){
+        btnTest.setEnabled(true);
+        mTest = false;
+        tvMessages.setText("Scent Stopped");
+        tvMessages.setTextColor(getResources().getColor(R.color.colorYellow));
+        btnConnect.setEnabled(true);
+        btnTest.setText("Test");
+        if (mHandler != null) {
+            mHandler.removeCallbacks(mRunnable);
+        }
+    }
 
     protected final ServiceConnection mServiceConnection = new ServiceConnection() {
 
@@ -294,6 +340,16 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
 
         }
     };
+
+    @Override
+    protected void onDestroy() {
+        unregisterReceiver(mGattUpdateReceiver);
+        scanLeDevice(false);
+        if (mBluetoothLeService != null)
+            mBluetoothLeService.disconnect();
+        unbindService(mServiceConnection);
+        super.onDestroy();
+    }
 
     private void dialogOnBleServiceDisconnected() {
         final AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -355,7 +411,10 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
             tvMessages.setTextColor(getResources().getColor(R.color.colorYellow));
             tvMessages.setText("Scanning...");
             mScanning = true;
-            if (mBluetoothLeService != null) mBluetoothLeService.scanForDevices(mLeScanCallback);
+            if (mBluetoothLeService != null){
+                mBluetoothLeService.close();
+                mBluetoothLeService.scanForDevices(mLeScanCallback);
+            }
         } else {
             mScanning = false;
             if (mBluetoothLeService != null) mBluetoothLeService.stopScanning(mLeScanCallback);
@@ -391,8 +450,10 @@ public class MainActivity extends AppCompatActivity implements Thread.UncaughtEx
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
         intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
-        intentFilter.addAction(BluetoothLeService.notification.OPBTPeripheralFirmwareRevisionNotification.name());
+        intentFilter.addAction(BluetoothLeService.notification.OPBTPeripheralPlayScentNotification.name());
+        intentFilter.addAction(BluetoothLeService.notification.OPBTPeripheralStopScentNotification.name());
         intentFilter.addAction(BluetoothLeService.notification.OPBTPeripheralRFIDReadNotification.name());
+        intentFilter.addAction(BluetoothLeService.notification.OPBTPeripheralDeviceStatusNotification.name());
         return intentFilter;
     }
 
